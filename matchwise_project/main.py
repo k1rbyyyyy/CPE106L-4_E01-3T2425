@@ -1,10 +1,35 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import List, Tuple
 import sqlite3
+import os
+import requests
 
+base_dir = os.path.dirname(os.path.abspath(__file__))
+db_path = os.path.join(base_dir, "matchwise.db")
 app = FastAPI()
 
 # User model
+
+GOOGLE_MAPS_API_KEY = "AIzaSyD6VUdTTciWHoYMrDIwIIHYjSpgFQwdCAA"
+
+def get_distance_km(origin: str, destination: str) -> float:
+    url = "https://maps.googleapis.com/maps/api/distancematrix/json"
+    params = {
+        "origins": origin,
+        "destinations": destination,
+        "key": GOOGLE_MAPS_API_KEY,
+        "units": "metric"
+    }
+    response = requests.get(url, params=params)
+    data = response.json()
+    try:
+        distance_meters = data["rows"][0]["elements"][0]["distance"]["value"]
+        return distance_meters / 1000.0
+    except Exception:
+        return float('inf')  # Return infinite distance if failed
+    
+
 class User(BaseModel):
     full_name: str
     email: str
@@ -17,7 +42,7 @@ def read_root():
 
 @app.get("/users/")
 def get_users():
-    conn = sqlite3.connect("matchwise.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id, full_name, email FROM users")
     users = cursor.fetchall()
@@ -26,7 +51,7 @@ def get_users():
 
 @app.post("/register/")
 def register_user(user: User):
-    conn = sqlite3.connect("matchwise.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -57,7 +82,7 @@ def create_listing(listing: Listing):
     if listing.type not in ["offer", "request"]:
         raise HTTPException(status_code=400, detail="Type must be 'offer' or 'request'")
     
-    conn = sqlite3.connect("matchwise.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO listings (user_id, skill_id, type, description, availability, location, radius_km)
@@ -70,7 +95,7 @@ def create_listing(listing: Listing):
 # Get all listings
 @app.get("/listings/")
 def get_all_listings():
-    conn = sqlite3.connect("matchwise.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT listing_id, user_id, skill_id, type, description, availability, location, radius_km
@@ -86,7 +111,7 @@ def get_listings_by_type(listing_type: str):
     if listing_type not in ["offer", "request"]:
         raise HTTPException(status_code=400, detail="Invalid listing type")
     
-    conn = sqlite3.connect("matchwise.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT listing_id, user_id, skill_id, type, description, availability, location, radius_km
@@ -96,44 +121,87 @@ def get_listings_by_type(listing_type: str):
     listings = cursor.fetchall()
     conn.close()
     return {f"{listing_type}_listings": listings}
+def parse_availability(avail_str: str) -> List[Tuple[str, int, int]]:
+    # Example input: "Mon 9-12,Tue 14-16"
+    timeslots = []
+    for slot in avail_str.split(","):
+        try:
+            day, hours = slot.strip().split()
+            start, end = map(int, hours.split("-"))
+            timeslots.append((day, start, end))
+        except ValueError:
+            continue
+    return timeslots
+
+def availability_overlap(req_avail: str, offer_avail: str) -> bool:
+    req_slots = parse_availability(req_avail)
+    offer_slots = parse_availability(offer_avail)
+    for r_day, r_start, r_end in req_slots:
+        for o_day, o_start, o_end in offer_slots:
+            if r_day == o_day and not (r_end <= o_start or r_start >= o_end):
+                return True
+    return False
+
+def score_match(request, offer) -> int:
+    score = 1  # skill already matches
+    if availability_overlap(request[1], offer[3]):
+        score += 1
+    if request[2] and offer[4] and request[2] == offer[4]:  # location string match
+        score += 1
+    return score
+
 @app.get("/match/{request_listing_id}/")
 def find_matches_for_request(request_listing_id: int):
-    conn = sqlite3.connect("matchwise.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Get the request listing details
+    # Get the request listing
     cursor.execute("""
-        SELECT skill_id, availability, location
+        SELECT skill_id, availability, location, radius_km
         FROM listings
         WHERE listing_id = ? AND type = 'request'
     """, (request_listing_id,))
     request_listing = cursor.fetchone()
-
     if not request_listing:
         conn.close()
         raise HTTPException(status_code=404, detail="Request listing not found.")
 
-    skill_id, req_avail, req_location = request_listing
+    skill_id, req_avail, req_location, req_radius = request_listing
 
-    # Find matching offers with same skill
+    # Get all offer listings for the same skill
     cursor.execute("""
-        SELECT listing_id, user_id, description, availability, location
+        SELECT listing_id, user_id, description, availability, location, radius_km
         FROM listings
         WHERE skill_id = ? AND type = 'offer'
     """, (skill_id,))
     offers = cursor.fetchall()
     conn.close()
 
-    return {
-        "matches": [
-            {
-                "listing_id": o[0],
-                "user_id": o[1],
-                "description": o[2],
-                "availability": o[3],
-                "location": o[4]
-            }
-            for o in offers
-            if req_avail in o[3] or o[3] in req_avail  # simple overlap check
-        ]
-    }
+    matches = []
+    for offer in offers:
+        offer_id, user_id, desc, offer_avail, offer_location, offer_radius = offer
+
+        # Compute availability overlap and distance
+        overlap = availability_overlap(req_avail, offer_avail)
+        distance = get_distance_km(req_location, offer_location)
+
+        # Skip offers outside radius
+        if distance > req_radius:
+            continue
+
+        score = score_match((skill_id, req_avail, req_location), offer, overlap, distance)
+
+        matches.append({
+            "listing_id": offer_id,
+            "user_id": user_id,
+            "description": desc,
+            "availability": offer_avail,
+            "location": offer_location,
+            "score": score,
+            "distance_km": round(distance, 2)
+        })
+
+    # Sort matches by score descending
+    matches.sort(key=lambda x: x["score"], reverse=True)
+
+    return {"matches": matches}
