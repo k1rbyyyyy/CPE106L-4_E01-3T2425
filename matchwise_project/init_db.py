@@ -1,7 +1,11 @@
 import sqlite3
+import os
 
-conn = sqlite3.connect("matchwise.db")
+base_dir = os.path.dirname(os.path.abspath(__file__))
+db_path = os.path.join(base_dir, "matchwise.db")
+conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
+
 
 cursor.executescript("""
 CREATE TABLE IF NOT EXISTS users (
@@ -60,6 +64,7 @@ CREATE TABLE IF NOT EXISTS feedback (
     FOREIGN KEY(receiver_id) REFERENCES users(user_id)
 );
 """)
+print("Database location:", os.path.abspath("matchwise.db"))
 
 conn.commit()
 conn.close()
