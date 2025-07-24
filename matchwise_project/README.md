@@ -110,9 +110,9 @@ matchwise_project/
 | Name                | Role                         |
 |---------------------|------------------------------|
 | Ivan                | Developer, System Integrator |
-| [Add Name Here]     | Database Designer            |
+| Ivan                | Database Designer            |
 | Kirby               | API Tester, Documentation    |
-| Kirby               | Algorithm & Matching Logic   |
+| [Add Name Here]     | Algorithm & Matching Logic   |
 
 > *Please update team names and roles as appropriate.*
 
