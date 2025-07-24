@@ -1,15 +1,15 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Tuple
+#from simulated_distance import get_distance_km (this was used to simulate distance before using Google Maps API)
 import sqlite3
 import os
 import requests
 
+
 base_dir = os.path.dirname(os.path.abspath(__file__))
 db_path = os.path.join(base_dir, "matchwise.db")
 app = FastAPI()
-
-# User model
 
 GOOGLE_MAPS_API_KEY = "AIzaSyD6VUdTTciWHoYMrDIwIIHYjSpgFQwdCAA"
 
@@ -27,7 +27,8 @@ def get_distance_km(origin: str, destination: str) -> float:
         distance_meters = data["rows"][0]["elements"][0]["distance"]["value"]
         return distance_meters / 1000.0
     except Exception:
-        return float('inf')  # Return infinite distance if failed
+        print(f"⚠️ Google API failed for: {origin} → {destination}")
+        return float('inf')
     
 
 class User(BaseModel):
@@ -106,7 +107,7 @@ def get_all_listings():
     return {"listings": listings}
 
 # Get listings by type
-@app.get("/listings/{listing_type}/")
+@app.get("/listings/{listing_type}")
 def get_listings_by_type(listing_type: str):
     if listing_type not in ["offer", "request"]:
         raise HTTPException(status_code=400, detail="Invalid listing type")
@@ -150,11 +151,12 @@ def score_match(request, offer) -> int:
         score += 1
     return score
 
-@app.get("/match/{request_listing_id}/")
+@app.get("/match/{request_listing_id}")
 def find_matches_for_request(request_listing_id: int):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    
     # Get the request listing
     cursor.execute("""
         SELECT skill_id, availability, location, radius_km
@@ -167,6 +169,8 @@ def find_matches_for_request(request_listing_id: int):
         raise HTTPException(status_code=404, detail="Request listing not found.")
 
     skill_id, req_avail, req_location, req_radius = request_listing
+
+    
 
     # Get all offer listings for the same skill
     cursor.execute("""
@@ -183,25 +187,24 @@ def find_matches_for_request(request_listing_id: int):
 
         # Compute availability overlap and distance
         overlap = availability_overlap(req_avail, offer_avail)
-        distance = get_distance_km(req_location, offer_location)
+        distance = get_distance_km(req_location, offer[4])
+        print(f"🧭 Distance from request to offer: {distance} km (offer in {offer[4]})")
 
-        # Skip offers outside radius
-        if distance > req_radius:
+        if distance > offer[5]:
+            print("❌ Skipping - outside radius:", offer[5])
             continue
 
-        score = score_match((skill_id, req_avail, req_location), offer, overlap, distance)
+        score = score_match((skill_id, req_avail, req_location), offer)
 
         matches.append({
-            "listing_id": offer_id,
-            "user_id": user_id,
-            "description": desc,
-            "availability": offer_avail,
-            "location": offer_location,
-            "score": score,
-            "distance_km": round(distance, 2)
-        })
-
+    "listing_id": offer_id,
+    "score": score,
+    "distance_km": distance,
+    "location": offer_location,
+    "debug": f"{req_location} → {offer_location} = {distance} km"
+})
     # Sort matches by score descending
     matches.sort(key=lambda x: x["score"], reverse=True)
 
     return {"matches": matches}
+
