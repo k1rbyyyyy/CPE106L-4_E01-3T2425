@@ -90,6 +90,8 @@ MatchWise is a community-based skill-sharing platform that intelligently matches
 - Uvicorn
 - SQLite (via Python standard library)
 - Pydantic
+- Google Maps Distance Matrix API
+- Flet
 
 ---
 
