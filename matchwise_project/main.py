@@ -11,6 +11,9 @@ db_path = os.path.join(base_dir, "matchwise.db")
 
 GOOGLE_MAPS_API_KEY = "AIzaSyD6VUdTTciWHoYMrDIwIIHYjSpgFQwdCAA"
 
+class AvailabilityUpdate(BaseModel):
+    availability: List[str]
+
 # Models
 class LoginData(BaseModel):
     username: str
@@ -29,22 +32,26 @@ def register_user(user: User):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     try:
-        # Convert availability to comma-separated string
-        availability_str = user.availability[0] if user.availability else ""
-        
+        # Insert user first
         cursor.execute("""
             INSERT INTO users
-              (full_name, username, password, email, location, availability, is_admin)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+              (full_name, username, password, email, location, is_admin)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             user.full_name,
             user.username,
             user.password,
             user.email,
             user.location,
-            availability_str,  # Use the first slot only
-            0  # is_admin is 0 for regular users
+            0  # is_admin
         ))
+        user_id = cursor.lastrowid
+
+        # Then insert availability if provided
+        if user.availability:
+            for slot in user.availability.split(","):
+                cursor.execute("INSERT INTO availability (user_id, timeslot) VALUES (?, ?)", (user_id, slot.strip()))
+
         conn.commit()
     except sqlite3.IntegrityError:
         conn.close()
@@ -80,35 +87,33 @@ def update_user_skills(user_id: int, skills: List[str] = Body(...)):
 def get_user_availability(user_id: int):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
-    # First try to get from availability table
     cursor.execute("SELECT timeslot FROM availability WHERE user_id = ?", (user_id,))
     slots = [row[0] for row in cursor.fetchall()]
-    
-    # If not found, try users table
-    if not slots:
-        cursor.execute("SELECT availability FROM users WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
-        if row and row[0]:
-            # Split comma-separated slots
-            slots = row[0].split(",")
-    
     conn.close()
     return {"availability": slots}
 
 @app.post("/update_availability/")
-def update_availability(user_id: int, slots: List[str] = Body(...)):
-    if len(slots) > 3:
-        raise HTTPException(400, "Max 3 slots allowed")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE users SET availability = ? WHERE user_id = ?",
-        (",".join(slots), user_id)
-    )
-    conn.commit()
-    conn.close()
-    return {"message": "Availability updated"}
+def update_availability(user_id: int, availability: List[str] = Body(...)):
+    try:
+        conn = sqlite3.connect(db_path)  # Fix: use correct DB path
+        c = conn.cursor()
+
+        # Delete old availability for user
+        c.execute("DELETE FROM availability WHERE user_id = ?", (user_id,))
+
+        # Insert new slots
+        for slot in availability:
+            if " " in slot and "-" in slot:
+                c.execute("INSERT INTO availability (user_id, timeslot) VALUES (?, ?)", (user_id, slot.strip()))
+
+        conn.commit()
+        return {"message": "Availability updated."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        conn.close()
 
 @app.get("/users/")
 def get_users():
@@ -129,12 +134,10 @@ def get_users():
 def get_user_skills(user_id: int):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT s.name
-        FROM user_skills us
-        JOIN skills s ON us.skill_id = s.skill_id
-        WHERE us.user_id = ?
-    """, (user_id,))
-    skills = [row[0] for row in cursor.fetchall()]
+    cursor.execute("SELECT skills FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
     conn.close()
-    return {"skills": skills}
+    if row and row[0]:
+        return {"skills": row[0].split(",")}
+    else:
+        return {"skills": []}

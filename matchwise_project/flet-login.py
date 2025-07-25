@@ -39,9 +39,20 @@ def main(page: ft.Page):
 
         # 4) fetch availability
             availability_resp = requests.get(f"http://127.0.0.1:8000/users/{user_id}/availability")
-            existing_slots = availability_resp.json().get("availability", []) \
-                            if availability_resp.headers.get("content-type","").startswith("application/json") \
-                            else []
+            if availability_resp.status_code == 200:
+                content_type = availability_resp.headers.get('content-type', '')
+                if 'application/json' in content_type:
+                    existing_slots = availability_resp.json().get("availability", [])
+                else:
+                # Try to parse as text
+                    existing_slots = []
+                    if availability_resp.text:
+                        try:
+                            existing_slots = [availability_resp.text]
+                        except:
+                            pass
+            else:
+                existing_slots = []
 
         # 5) now call dashboard with both lists in hand
             show_dashboard(page, full_name, user_id, current_skills, existing_slots)

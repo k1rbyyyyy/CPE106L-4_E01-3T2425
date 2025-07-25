@@ -70,14 +70,14 @@ def main(page: ft.Page):
             output.value = "⚠️ Please select day, start and end hours."
         else:
             payload = {
-                "username":    user,
-                "password":    pwd,
-                "email":       mail,
-                "full_name":   name,
-                "location":    loc,
-                "skills":      skills,
-                "availability": avail_list
-            }
+            "username":    user,
+            "password":    pwd,
+            "email":       mail,
+            "full_name":   name,
+            "location":    loc,
+            "skills":      skills,
+            "availability": avail_list  # Send as list
+                        }
             try:
                 resp = requests.post("http://127.0.0.1:8000/register/", json=payload)
                 if resp.status_code == 200:
