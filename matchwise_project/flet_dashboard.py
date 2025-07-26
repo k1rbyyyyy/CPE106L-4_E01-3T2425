@@ -1,5 +1,6 @@
 import flet as ft
 import requests
+from flet import Ref
 
 # ─── Dashboard ────────────────────────────────────────────────────────────────
 def show_dashboard(page: ft.Page,
@@ -67,10 +68,8 @@ def show_skill_editor(page: ft.Page,
     page.clean()
     page.title = "Edit Skills"
 
-    skill_names = [
-        "Cooking", "Tutoring", "Programming", "Plumbing", "Driving",
-        "Cleaning", "Gardening", "Nursing", "Carpentry"
-    ]
+    skill_names = ["Cooking","Tutoring","Programming","Plumbing",
+                   "Driving","Cleaning","Gardening","Nursing","Carpentry"]
 
     dropdowns: list[ft.Dropdown] = []
     status_text = ft.Text()
@@ -78,15 +77,16 @@ def show_skill_editor(page: ft.Page,
     def update_options(*_):
         selected = {d.value for d in dropdowns if d.value}
         for dd in dropdowns:
-            current = dd.value
+            curr = dd.value
             dd.options = [
                 ft.dropdown.Option(text=s)
                 for s in skill_names
-                if s == current or s not in selected
+                if s == curr or s not in selected
             ]
         page.update()
 
-    # Build 5 dropdowns
+    # Build centered rows of Dropdown + Reset
+    rows = []
     for i in range(5):
         dd = ft.Dropdown(
             label=f"Skill {i+1}",
@@ -96,24 +96,51 @@ def show_skill_editor(page: ft.Page,
         )
         dropdowns.append(dd)
 
+        def make_reset(dd=dd):
+            def _reset(_):
+                dd.value = None
+                dd.update()
+                update_options()
+            return _reset
+
+        reset_btn = ft.TextButton("Reset", on_click=make_reset())
+
+        rows.append(
+            ft.Row(
+                [dd, reset_btn],
+                spacing=10,
+                alignment=ft.MainAxisAlignment.CENTER
+            )
+        )
+
     def save_skills(e):
         selected = [d.value for d in dropdowns if d.value]
         if not selected:
             status_text.value = "⚠️ Select at least one skill."
+            page.update()
+            return
+        resp = requests.post(
+            "http://127.0.0.1:8000/update_skills/",
+            params={"user_id": user_id},
+            json=selected
+        )
+        if resp.ok:
+            r2 = requests.get(f"http://127.0.0.1:8000/users/{user_id}/skills")
+            fresh = r2.json().get("skills", [])
+            status_text.value = "✅ Saved!"
+            show_skill_editor(page, user_id, fresh, full_name, existing_slots)
+            return
         else:
-            resp = requests.post(
-                "http://127.0.0.1:8000/update_skills/",
-                params={"user_id": user_id},
-                json=selected
-            )
-            if resp.ok:
-                status_text.value = "✅ Skills updated!"
-                show_dashboard(page, full_name, user_id, selected, existing_slots)
-            else:
-                status_text.value = f"❌ {resp.json().get('detail','Update failed')}"
+            status_text.value = f"❌ {resp.json().get('detail','Update failed')}"
         page.update()
 
-    # Initial dedupe
+    def back_to_dashboard(e):
+        from flet_dashboard import show_dashboard
+        show_dashboard(page, full_name, user_id,
+                       [d.value for d in dropdowns if d.value],
+                       existing_slots)
+
+    # initial dedupe
     update_options()
 
     page.add(
@@ -121,11 +148,14 @@ def show_skill_editor(page: ft.Page,
             content=ft.Column(
                 [
                     ft.Text("🎯 Edit Your Skills (up to 5)", size=20, weight=ft.FontWeight.BOLD),
-                    *dropdowns,
-                    ft.ElevatedButton("💾 Save Skills", on_click=save_skills),
+                    *rows,
+                    ft.Row([
+                        ft.ElevatedButton("💾 Save", on_click=save_skills),
+                        ft.ElevatedButton("◀️ Back", on_click=back_to_dashboard),
+                    ], spacing=20, alignment=ft.MainAxisAlignment.CENTER),
                     status_text
                 ],
-                spacing=10,
+                spacing=12,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER
             ),
             alignment=ft.alignment.center,
@@ -140,58 +170,52 @@ def show_availability_editor(page: ft.Page,
                              existing_slots: list,
                              full_name: str,
                              current_skills: list):
+
     page.clean()
     page.title = "Edit Availability"
 
-    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    days  = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
     hours = [str(h) for h in range(24)]
 
     slot_controls = []
-    slot_rows = []
-    status = ft.Text()
+    slot_rows     = []
+    status        = ft.Text()
 
-    # Pad to 3 entries if fewer
-    while len(existing_slots) < 3:
-        existing_slots.append("")
+    def make_clear_fn(dc, sc, ec):
+        def _clear(_):
+            dc.value = None
+            sc.value = None
+            ec.value = None
+            dc.update()
+            sc.update()
+            ec.update()
+        return _clear
 
-    def make_reset(refs):
-        def _reset(_):
-            for ref in refs:
-                ref.current.value = ""
-                ref.current.update()
-        return _reset
-
+    # build up to 3 rows
     for i in range(3):
         d = s = e = None
-        if existing_slots[i]:
+        if i < len(existing_slots):
             parts = existing_slots[i].split(" ", 1)
             if len(parts) == 2 and "-" in parts[1]:
                 d, times = parts
-                s, e = times.split("-", 1)
+                s, e     = times.split("-", 1)
 
-        day_ref = ft.Ref[ft.Dropdown]()
-        start_ref = ft.Ref[ft.Dropdown]()
-        end_ref = ft.Ref[ft.Dropdown]()
+        dc = ft.Dropdown(label="Day",   options=[ft.dropdown.Option(x) for x in days],   value=d)
+        sc = ft.Dropdown(label="Start", options=[ft.dropdown.Option(x) for x in hours], value=s)
+        ec = ft.Dropdown(label="End",   options=[ft.dropdown.Option(x) for x in hours], value=e)
 
-        dc = ft.Dropdown(label="Day", options=[ft.dropdown.Option(x) for x in days], value=d, ref=day_ref)
-        sc = ft.Dropdown(label="Start", options=[ft.dropdown.Option(x) for x in hours], value=s, ref=start_ref)
-        ec = ft.Dropdown(label="End", options=[ft.dropdown.Option(x) for x in hours], value=e, ref=end_ref)
-
-        clear_btn = ft.TextButton("Reset", on_click=make_reset([day_ref, start_ref, end_ref]))
-
-        slot_controls.append((day_ref, start_ref, end_ref))
+        clear_btn = ft.TextButton("Reset", on_click=make_clear_fn(dc, sc, ec))
+        slot_controls.append((dc, sc, ec))
         slot_rows.append(
-            ft.Row([dc, sc, ec, clear_btn], spacing=10, alignment=ft.MainAxisAlignment.CENTER)
+            ft.Row([dc, sc, ec, clear_btn],
+                   spacing=10,
+                   alignment=ft.MainAxisAlignment.CENTER)
         )
 
-    def save(e):
+    def save_slots(e):
         slots, errors = [], []
-
-        for idx, (day_ref, start_ref, end_ref) in enumerate(slot_controls, start=1):
-            dc = day_ref.current
-            sc = start_ref.current
-            ec = end_ref.current
-
+        for idx, (dc, sc, ec) in enumerate(slot_controls, start=1):
+            # skip empty rows
             if not (dc.value or sc.value or ec.value):
                 continue
             if not (dc.value and sc.value and ec.value):
@@ -216,29 +240,43 @@ def show_availability_editor(page: ft.Page,
             return
 
         try:
+            # persist to backend
             resp = requests.post(
                 "http://127.0.0.1:8000/update_availability/",
                 params={"user_id": user_id},
                 json=slots
             )
             resp.raise_for_status()
+
+            # re‑fetch current slots
             r2 = requests.get(f"http://127.0.0.1:8000/users/{user_id}/availability")
             r2.raise_for_status()
-            updated_slots = r2.json().get("availability", [])
-            show_dashboard(page, full_name, user_id, current_skills, updated_slots)
+            updated = r2.json().get("availability", slots)
 
-        except requests.RequestException as ex:
-            status.value = f"❌ Network error: {str(ex)}"
+            # rebuild this editor in place
+            status.value = "✅ Saved!"
+            show_availability_editor(page, user_id, updated, full_name, current_skills)
+            return
+
+        except Exception as ex:
+            status.value = f"❌ {ex}"
             page.update()
 
-    # Layout
+    def back_to_dashboard(e):
+        from flet_dashboard import show_dashboard
+        show_dashboard(page, full_name, user_id, current_skills, existing_slots)
+
+    # layout
     page.add(
         ft.Container(
             content=ft.Column(
                 [
                     ft.Text("⏰ Edit Your Availability (max 3)", size=20, weight=ft.FontWeight.BOLD),
                     *slot_rows,
-                    ft.ElevatedButton("💾 Save Availability", on_click=save),
+                    ft.Row([
+                        ft.ElevatedButton("💾 Save", on_click=save_slots),
+                        ft.ElevatedButton("◀️ Back to Dashboard", on_click=back_to_dashboard),
+                    ], spacing=20, alignment=ft.MainAxisAlignment.CENTER),
                     status
                 ],
                 spacing=15,

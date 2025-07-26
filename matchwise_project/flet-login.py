@@ -4,83 +4,71 @@ import subprocess
 import sys
 from flet_dashboard import show_dashboard
 
+#Login menu---------------------------------------------
+import flet as ft
+import requests
+import subprocess
+import sys
+from flet_dashboard import show_dashboard
+
+import flet as ft
+import requests
+import subprocess
+import sys
+from flet_dashboard import show_dashboard
+
 def main(page: ft.Page):
     page.title = "User Login"
 
     # Input fields
-    username = ft.TextField(label="Username")
-    password = ft.TextField(label="Password", password=True)
+    username = ft.TextField(label="Username", width=300)
+    password = ft.TextField(label="Password", password=True, width=300)
     output = ft.Text()
 
-    # Register Button Action
     def open_register(e):
         subprocess.Popen([sys.executable, "flet-register.py"])
         sys.exit()
 
-    # Login Button Action
     def login_user(e):
-    # 1) build your payload
-        login_data = {
-            "username": username.value,
-            "password": password.value
-    }
-
+        login_data = {"username": username.value, "password": password.value}
         try:
-        # 2) POST to /login/
             response = requests.post("http://127.0.0.1:8000/login/", json=login_data)
             response.raise_for_status()
             result = response.json()
             full_name = result["full_name"]
             user_id   = result["user_id"]
 
-        # 3) fetch skills
             skills_resp = requests.get(f"http://127.0.0.1:8000/users/{user_id}/skills")
-            current_skills = skills_resp.json().get("skills", []) if skills_resp.status_code == 200 else []
+            current_skills = skills_resp.json().get("skills", []) if skills_resp.ok else []
+            avail_resp = requests.get(f"http://127.0.0.1:8000/users/{user_id}/availability")
+            existing_slots = avail_resp.json().get("availability", []) if avail_resp.ok else []
 
-        # 4) fetch availability
-            availability_resp = requests.get(f"http://127.0.0.1:8000/users/{user_id}/availability")
-            if availability_resp.status_code == 200:
-                content_type = availability_resp.headers.get('content-type', '')
-                if 'application/json' in content_type:
-                    existing_slots = availability_resp.json().get("availability", [])
-                else:
-                # Try to parse as text
-                    existing_slots = []
-                    if availability_resp.text:
-                        try:
-                            existing_slots = [availability_resp.text]
-                        except:
-                            pass
-            else:
-                existing_slots = []
-
-        # 5) now call dashboard with both lists in hand
             show_dashboard(page, full_name, user_id, current_skills, existing_slots)
 
         except requests.HTTPError:
-            detail = response.json().get("detail","Invalid credentials")
-            output.value = f"❌ {detail}"
-            page.update()
+            output.value = "❌ Invalid credentials"
         except Exception as ex:
             output.value = f"⚠️ Connection failed: {ex}"
-            page.update()
+        page.update()
 
-    # Login Button
-    login_btn = ft.ElevatedButton(text="Login", on_click=login_user)
-
-    # Layout
     page.add(
         ft.Container(
-            content=ft.Column([
-                username,
-                password,
-                login_btn,
-                output,
-                ft.TextButton(text="Create a new account", on_click=open_register)
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            expand=True,
             alignment=ft.alignment.center,
-            expand=True
+            content=ft.Column(
+                [
+                    ft.Text("Welcome to MatchWise! Please Log in:", size=16, weight=ft.FontWeight.BOLD),
+                    username,
+                    password,
+                    ft.ElevatedButton("Login", on_click=login_user, width=300),
+                    output,
+                    ft.TextButton("Create a new account", on_click=open_register)
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=20,
+                width=400
+            ),
         )
     )
 
