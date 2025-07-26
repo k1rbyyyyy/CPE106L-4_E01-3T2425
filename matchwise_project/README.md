@@ -100,6 +100,9 @@ MatchWise is a community-based skill-sharing platform that intelligently matches
 ```
 matchwise_project/
 ├── main.py          # FastAPI backend
+├──	flet_dashboard	 # Dashboard for app
+├──	flet-login		 # Initiates the login UI
+├──	flet-register    # Initiates the register UI
 ├── init_db.py       # SQLite database setup
 ├── matchwise.db     # SQLite database file (auto-created)
 └── README.md        # Project documentation
