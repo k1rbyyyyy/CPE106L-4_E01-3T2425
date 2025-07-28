@@ -4,19 +4,6 @@ import subprocess
 import sys
 from flet_dashboard import show_dashboard
 
-#Login menu---------------------------------------------
-import flet as ft
-import requests
-import subprocess
-import sys
-from flet_dashboard import show_dashboard
-
-import flet as ft
-import requests
-import subprocess
-import sys
-from flet_dashboard import show_dashboard
-
 def main(page: ft.Page):
     page.title = "User Login"
 

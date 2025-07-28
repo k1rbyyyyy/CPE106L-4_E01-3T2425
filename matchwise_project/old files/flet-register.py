@@ -17,24 +17,38 @@ def main(page: ft.Page):
     location  = ft.TextField(label="Location")
     output    = ft.Text()
 
-    skill_options = [
-        ft.dropdown.Option(key="Cooking",     text="Cooking"),
-        ft.dropdown.Option(key="Tutoring",    text="Tutoring"),
-        ft.dropdown.Option(key="Programming", text="Programming"),
-        ft.dropdown.Option(key="Plumbing",    text="Plumbing"),
-        ft.dropdown.Option(key="Driving",     text="Driving"),
-        ft.dropdown.Option(key="Cleaning",    text="Cleaning"),
-        ft.dropdown.Option(key="Gardening",   text="Gardening"),
-        ft.dropdown.Option(key="Nursing",     text="Nursing"),
-        ft.dropdown.Option(key="Carpentry",   text="Carpentry"),
-    ]
+    # --- Start of Changes ---
 
-    skill_dropdowns = [
-        ft.Dropdown(label=f"Skill {i+1}", options=skill_options)
-        for i in range(5)
+    skill_names = [
+        "Cooking", "Tutoring", "Programming", "Plumbing", "Driving",
+        "Cleaning", "Gardening", "Nursing", "Carpentry"
     ]
+    skill_dropdowns = []
 
-    # 4) Availability selectors
+    # 👇 1. Add the function to update dropdown options
+    def update_options(*_):
+        selected = {dd.value for dd in skill_dropdowns if dd.value}
+        for dd in skill_dropdowns:
+            current_val = dd.value
+            dd.options = [
+                ft.dropdown.Option(s)
+                for s in skill_names
+                if s == current_val or s not in selected
+            ]
+        page.update()
+
+    # 👇 2. Create dropdowns and attach the on_change handler
+    for i in range(5):
+        dd = ft.Dropdown(
+            label=f"Skill {i+1}",
+            options=[ft.dropdown.Option(s) for s in skill_names],
+            on_change=update_options
+        )
+        skill_dropdowns.append(dd)
+
+    # --- End of Changes ---
+
+    # Availability selectors
     days  = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
     hours = list(range(24))
     day_dropdown   = ft.Dropdown(label="Day",         options=[ft.dropdown.Option(key=d, text=d) for d in days])
@@ -64,8 +78,9 @@ def main(page: ft.Page):
             output.value = "⚠️ Please enter a location."
         elif not skills:
             output.value = "⚠️ Please select at least one skill."
-        elif len(skills) != len(set(skills)):
-            output.value = "⚠️ You have selected the same skill more than once."
+        # 👇 3. Removed redundant check, as the UI now prevents duplicates
+        # elif len(skills) != len(set(skills)):
+        #     output.value = "⚠️ You have selected the same skill more than once."
         elif None in (day_dropdown.value, start_dropdown.value, end_dropdown.value):
             output.value = "⚠️ Please select day, start and end hours."
         else:
@@ -76,7 +91,7 @@ def main(page: ft.Page):
             "full_name":   name,
             "location":    loc,
             "skills":      skills,
-            "availability": avail_list  # Send as list
+            "availability": avail_list
                         }
             try:
                 resp = requests.post("http://127.0.0.1:8000/register/", json=payload)

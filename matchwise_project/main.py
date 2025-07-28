@@ -3,141 +3,103 @@ from pydantic import BaseModel
 from typing import List
 import sqlite3
 import os
-import requests
 
 app = FastAPI()
+
+# Set up path to database
 base_dir = os.path.dirname(os.path.abspath(__file__))
 db_path = os.path.join(base_dir, "matchwise.db")
 
-GOOGLE_MAPS_API_KEY = "AIzaSyD6VUdTTciWHoYMrDIwIIHYjSpgFQwdCAA"
+Maps_API_KEY = "AIzaSyD6VUdTTciWHoYMrDIwIIHYjSpgFQwdCAA"
 
-class AvailabilityUpdate(BaseModel):
-    availability: List[str]
-
-# Models
+# -------------------- MODELS --------------------
 class LoginData(BaseModel):
     username: str
     password: str
 
+# User model no longer includes 'skills' or 'availability'
 class User(BaseModel):
     full_name: str
     username: str
     password: str
     email: str
     location: str = ""
-    availability: str = ""
+
+class CreateListing(BaseModel):
+    user_id: int
+    type: str
+    skill: str
+    availability: str
+    description: str
+
+# -------------------- ENDPOINTS --------------------
 
 @app.post("/register/")
 def register_user(user: User):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     try:
-        # Insert user first
+        # Removed availability and skills insertion logic
         cursor.execute("""
-            INSERT INTO users
-              (full_name, username, password, email, location, is_admin)
+            INSERT INTO users (full_name, username, password, email, location, is_admin)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            user.full_name,
-            user.username,
-            user.password,
-            user.email,
-            user.location,
-            0  # is_admin
-        ))
-        user_id = cursor.lastrowid
-
-        # Then insert availability if provided
-        if user.availability:
-            for slot in user.availability.split(","):
-                cursor.execute("INSERT INTO availability (user_id, timeslot) VALUES (?, ?)", (user_id, slot.strip()))
-
+        """, (user.full_name, user.username, user.password, user.email, user.location, 0))
         conn.commit()
     except sqlite3.IntegrityError:
         conn.close()
         raise HTTPException(status_code=400, detail="User already exists or invalid data.")
-    conn.close()
+    finally:
+        if conn:
+            conn.close()
     return {"message": f"User '{user.username}' registered successfully!"}
 
 @app.post("/login/")
 def login(data: LoginData):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, full_name FROM users WHERE username = ? AND password = ?", (data.username, data.password))
+    cursor.execute("SELECT user_id, full_name, location FROM users WHERE username = ? AND password = ?", (data.username, data.password))
     user = cursor.fetchone()
     conn.close()
-
     if user:
-        user_id, full_name = user
-        return {"message": "Login successful!", "user_id": user_id, "full_name": full_name}
+        user_id, full_name, location = user
+        return {"message": "Login successful!", "user_id": user_id, "full_name": full_name, "location": location}
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-@app.post("/update_skills/")
-def update_user_skills(user_id: int, skills: List[str] = Body(...)):
+@app.post("/listings/")
+def create_listing(listing: CreateListing):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    skills_str = ",".join(skills)
-    cursor.execute("UPDATE users SET skills = ? WHERE user_id = ?", (skills_str, user_id))
-    conn.commit()
-    conn.close()
-    return {"message": "Skills updated successfully"}
-
-@app.get("/users/{user_id}/availability")
-def get_user_availability(user_id: int):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT timeslot FROM availability WHERE user_id = ?", (user_id,))
-    slots = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return {"availability": slots}
-
-@app.post("/update_availability/")
-def update_availability(user_id: int, availability: List[str] = Body(...)):
     try:
-        conn = sqlite3.connect(db_path)  # Fix: use correct DB path
-        c = conn.cursor()
+        cursor.execute("SELECT skill_id FROM skills WHERE name = ?", (listing.skill,))
+        result = cursor.fetchone()
+        skill_id = result[0] if result else cursor.execute("INSERT INTO skills (name) VALUES (?)", (listing.skill,)).lastrowid
 
-        # Delete old availability for user
-        c.execute("DELETE FROM availability WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT location FROM users WHERE user_id = ?", (listing.user_id,))
+        user_location_row = cursor.fetchone()
+        user_location = user_location_row[0] if user_location_row else "Unknown"
 
-        # Insert new slots
-        for slot in availability:
-            if " " in slot and "-" in slot:
-                c.execute("INSERT INTO availability (user_id, timeslot) VALUES (?, ?)", (user_id, slot.strip()))
-
+        cursor.execute("""
+            INSERT INTO listings (user_id, skill_id, type, availability, description, location)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (listing.user_id, skill_id, listing.type, listing.availability, listing.description, user_location))
         conn.commit()
-        return {"message": "Availability updated."}
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
     finally:
-        conn.close()
+        if conn:
+            conn.close()
+    return {"message": "Listing created successfully"}
 
-@app.get("/users/")
-def get_users():
+@app.get("/skills/")
+def get_all_skills():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT user_id, full_name, email, skills
-        FROM users
-    """)
-    rows = cursor.fetchall()
-    conn.close()
-    return [
-      {"user_id": uid, "full_name": fn, "email": em, "skills": skills.split(",") if skills else []}
-      for uid,fn,em,skills in rows
-    ]
-
-@app.get("/users/{user_id}/skills")
-def get_user_skills(user_id: int):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT skills FROM users WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row and row[0]:
-        return {"skills": row[0].split(",")}
-    else:
-        return {"skills": []}
+    try:
+        # Simplified to only get skills from the official 'skills' table
+        cursor.execute("SELECT name FROM skills ORDER BY name ASC")
+        skills = {row[0] for row in cursor.fetchall()}
+        return {"skills": sorted(list(skills))}
+    finally:
+        if conn:
+            conn.close()
