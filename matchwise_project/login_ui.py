@@ -11,8 +11,10 @@ def main(page: ft.Page):
     status_output = ft.Text()
 
     def open_register(e):
-        subprocess.Popen([sys.executable, "register_ui.py"])
-        sys.exit()
+        # Clear the current page and show registration form
+        page.controls.clear()
+        from register_ui import main as register_main
+        register_main(page)
 
     def attempt_login(e):
         result = authenticate_and_get_data(username_field.value, password_field.value)

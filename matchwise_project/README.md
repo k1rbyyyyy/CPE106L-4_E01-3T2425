@@ -6,107 +6,267 @@ MatchWise is a community-based skill-sharing platform that intelligently matches
 
 ## 🚀 Features
 
-- User registration and profile management
-- Skill management and tagging
-- Listing system (offer/request)
-- Greedy-based matching algorithm
-- SQLite database
-- FastAPI backend with auto-generated docs
-- JSON-based REST API
+- **User registration and profile management** - Create accounts with location and availability
+- **Skill management and tagging** - 30+ predefined skills with easy selection  
+- **Smart listing system** - Create offers and requests for skills
+- **Advanced matching algorithm** - Matches based on:
+  - Skill compatibility (40 points)
+  - Location proximity (25 points) 
+  - Availability overlap (25 points)
+  - User activity level (10 points)
+- **Real-time match scoring** - Scores from 0-100% for match quality
+- **Interactive dashboard** - View matches, create listings, browse all listings
+- **SQLite database** - Persistent data storage
+- **FastAPI backend** - High-performance API with auto-generated docs
+- **Flet UI** - Modern desktop interface
+
+---
+
+## 🎯 What's New & Completed
+
+### ✅ Completed Functions:
+
+1. **Advanced Matching Algorithm**
+   - `calculate_match_score()` - Comprehensive scoring system
+   - `calculate_availability_overlap()` - Time slot matching
+   - `calculate_distance()` - Location-based scoring (with Google Maps API fallback)
+
+2. **Complete API Endpoints**
+   - `POST /matches/find/` - Find potential matches for users
+   - `POST /matches/create/` - Create matches between users  
+   - `GET /matches/` - View user's existing matches
+   - `PUT /matches/{match_id}/status/` - Accept/decline/complete matches
+   - `GET /listings/` - Browse all listings with filters
+
+3. **Enhanced Dashboard**
+   - **View Matches** - See potential and existing matches with scores
+   - **My Listings** - Manage your offers and requests
+   - **Browse Listings** - Explore all community listings
+   - **Create Listings** - Easy form with validation
+
+4. **Database Improvements**
+   - Added status tracking for listings and matches
+   - Timestamps for all records
+   - Proper foreign key relationships
+   - Sample data for testing
+
+### 🎯 Easier Matching System:
+
+- **Automatic Match Discovery** - System finds matches for you
+- **Smart Scoring** - Clear percentage scores show match quality
+- **Time Overlap Detection** - Shows exactly when you're both available
+- **One-Click Actions** - Accept, decline, or complete matches easily
+- **Visual Feedback** - Color-coded status and clear icons
 
 ---
 
 ## 🛠️ Setup Instructions
 
-### ✅ Ubuntu Virtual Machine
+### ✅ Windows Terminal
 
-1. Open Terminal in your project directory:
+1. **Navigate to project folder:**
    ```bash
-   cd ~/matchwise_project
+   cd "c:\Users\Asus TUF\Downloads\Reop\CPE106L-4_E01-3T2425-3\matchwise_project"
    ```
 
-2. Create a virtual environment (optional but recommended):
+2. **Install dependencies:**
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
+   pip install fastapi uvicorn requests flet
    ```
 
-3. Install dependencies:
+3. **Initialize database with sample data:**
    ```bash
-   pip install fastapi uvicorn
+   python init_db.py
+   python add_sample_data.py
    ```
 
-4. Initialize the database:
+4. **Start the application:**
    ```bash
-   python3 init_db.py
+   python start_app.py
+   ```
+   This will:
+   - Start the FastAPI server
+   - Open API docs in browser
+   - Show instructions for UI
+
+5. **Start the UI (in a new terminal):**
+   ```bash
+   python login_ui.py
    ```
 
-5. Start the FastAPI server:
-   ```bash
-   uvicorn main:app --reload
-   ```
-
-6. Visit the interactive API docs:
-   [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+6. **Test with sample accounts:**
+   - Username: `alice` / Password: `password123`
+   - Username: `bob` / Password: `password123`
+   - Username: `carol` / Password: `password123`
 
 ---
 
-### ✅ Windows Terminal
+## 🔧 Quick Start Guide
 
-1. Open Windows Terminal and go to your project folder:
-   ```bash
-   cd path\to\matchwise_project
-   ```
+### 1. Testing the Matching System
 
-2. (Optional) Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
+1. **Login** as `alice` (password: `password123`)
+2. **View Matches** - See potential matches for Alice's programming offer and cooking request
+3. **Create a Match** - Click "Create Match" on a high-scoring potential match
+4. **Switch Users** - Logout and login as `bob` to see the match from the other side
+5. **Accept/Decline** - Bob can accept or decline Alice's programming help
 
-3. Install dependencies:
-   ```bash
-   pip install fastapi uvicorn
-   ```
+### 2. Creating New Listings
 
-4. Run the database setup:
-   ```bash
-   python init_db.py
-   ```
+1. **Click "Create Listing"**
+2. **Choose Type** - Offer a skill or Request help
+3. **Select Skill** - From 30+ available skills
+4. **Add Description** - What specifically you need/offer
+5. **Set Availability** - When you're available
+6. **Submit** - System automatically finds matches
 
-5. Start the FastAPI server:
-   ```bash
-   uvicorn main:app --reload
-   ```
+### 3. Browse Community
 
-6. Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to access the API.
+1. **Click "Browse All Listings"**
+2. **Filter** - By type (offers/requests) or skill
+3. **View Details** - See what others are offering/requesting
+4. **Manual Matching** - Contact users directly
+
+---
+
+## 📊 API Documentation
+
+**Interactive API docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### Key Endpoints:
+
+- `POST /register/` - Create new user account
+- `POST /login/` - User authentication  
+- `POST /listings/` - Create skill listing
+- `GET /listings/` - Browse listings with filters
+- `POST /matches/find/` - Find potential matches
+- `POST /matches/create/` - Create match between users
+- `GET /matches/` - View user's matches
+- `PUT /matches/{match_id}/status/` - Update match status
+
+---
+
+## 🏗️ Project Structure
+
+```
+matchwise_project/
+├── main.py              # FastAPI backend with matching algorithms
+├── init_db.py           # Database initialization with schema
+├── add_sample_data.py   # Sample users and listings for testing
+├── migrate_db.py        # Database schema updates
+├── start_app.py         # Easy startup script
+├── flet_dashboard.py    # Complete UI dashboard with all features
+├── login_ui.py          # Login interface
+├── login_data.py        # Login API integration
+├── register_ui.py       # Registration interface  
+├── register_data.py     # Registration API integration
+├── matchwise.db         # SQLite database (auto-created)
+└── README.md           # This documentation
+```
+
+---
+
+## 🧮 Matching Algorithm Details
+
+### Scoring System (0-100 points):
+
+1. **Skill Match (40 points)** - Must match exactly
+2. **Location Proximity (25 points)**
+   - Same location: 25 points
+   - Within 10km: 25 points
+   - Within 25km: 20 points
+   - Within 50km: 15 points
+   - Within 100km: 10 points
+   - Further: 5 points
+
+3. **Availability Overlap (25 points)**
+   - More overlapping time slots = higher score
+   - Calculated by parsing "Day HH-HH" format
+
+4. **Activity Level (10 points)**
+   - Recent activity and responsiveness
+
+### Example Calculation:
+- Alice offers Programming on "Mon 18-20"
+- Bob requests Programming on "Mon 19-21"  
+- Both in New York
+- **Score: 40 + 25 + 20 + 10 = 95%** (Excellent match!)
 
 ---
 
 ## 📦 Dependencies
 
-- Python 3.12+
-- FastAPI
-- Uvicorn
-- SQLite (via Python standard library)
-- Pydantic
-- Google Maps Distance Matrix API
-- Flet
+- **Python 3.12+**
+- **FastAPI** - Modern web framework
+- **Uvicorn** - ASGI server
+- **SQLite** - Database (via Python standard library)
+- **Pydantic** - Data validation
+- **Requests** - HTTP client
+- **Flet** - Desktop UI framework
+- **Google Maps API** (optional) - For accurate distance calculation
 
 ---
 
-## 📂 Project Structure
+## 🎮 Demo Scenarios
 
-```
-matchwise_project/
-├── main.py          # FastAPI backend
-├──	flet_dashboard	 # Dashboard for app
-├──	flet-login		 # Initiates the login UI
-├──	flet-register    # Initiates the register UI
-├── init_db.py       # SQLite database setup
-├── matchwise.db     # SQLite database file (auto-created)
-└── README.md        # Project documentation
-```
+### Scenario 1: Programming Help
+1. Alice offers Python programming tutoring
+2. Bob requests JavaScript help  
+3. **No match** - Different skills
+
+### Scenario 2: Cooking Lessons
+1. Carol offers cooking lessons in Brooklyn
+2. Alice requests cooking help in New York
+3. **85% match** - Same skill, nearby locations, some time overlap
+
+### Scenario 3: Perfect Match
+1. Eva offers guitar lessons "Wed 17-21"
+2. David requests guitar lessons "Wed 18-20"
+3. **95% match** - Same skill, overlapping times, nearby
+
+---
+
+## 🚀 Advanced Features
+
+### For Developers:
+- **Real-time matching** via WebSocket (can be added)
+- **Machine learning** recommendations (can be integrated)
+- **Rating system** for match quality improvement
+- **Calendar integration** for availability management
+
+### For Users:
+- **Smart notifications** for new matches
+- **Feedback system** to improve matching
+- **Community features** like skill groups
+- **Mobile app** version using Flet mobile
+
+---
+
+## 🔍 Troubleshooting
+
+### Common Issues:
+
+1. **Server won't start**
+   ```bash
+   pip install --upgrade fastapi uvicorn
+   python -m uvicorn main:app --reload
+   ```
+
+2. **Database errors**
+   ```bash
+   python migrate_db.py
+   python init_db.py
+   ```
+
+3. **No matches found**
+   - Check that users have created both offers and requests
+   - Verify skills match exactly
+   - Run `python add_sample_data.py` for test data
+
+4. **UI connection errors**
+   - Ensure FastAPI server is running on port 8000
+   - Check firewall settings
+   - Verify API base URL in flet_dashboard.py
 
 ---
 
@@ -117,15 +277,27 @@ matchwise_project/
 | Ivan                | Developer, System Integrator |
 | Ivan                | Database Designer            |
 | Kirby               | API Tester, Documentation    |
-| [Add Name Here]     | Algorithm & Matching Logic   |
-
-> *Please update team names and roles as appropriate.*
+| **GitHub Copilot**  | **Algorithm & Matching Logic Developer** |
 
 ---
 
-## ✅ Next Features (Optional Ideas)
+## ✅ Future Enhancements
 
-- Google Maps API integration for real location matching
-- Flet Desktop GUI
-- Skill demand and match visualization using Matplotlib
-- Admin dashboard and user feedback system
+- 🗺️ **Google Maps integration** for real location matching
+- 📱 **Mobile app** with Flet mobile framework  
+- 📊 **Analytics dashboard** with match success rates
+- 💬 **In-app messaging** between matched users
+- ⭐ **Rating and review system** for skill providers
+- 🔔 **Push notifications** for new matches
+- 🎯 **AI-powered** skill recommendations
+- 📅 **Calendar integration** for scheduling
+
+---
+
+## 📄 License
+
+This project is created for educational purposes as part of CPE106L coursework.
+
+---
+
+**🎉 Happy Skill Sharing with MatchWise! 🎉**
