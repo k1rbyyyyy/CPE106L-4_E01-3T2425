@@ -275,9 +275,10 @@ matchwise_project/
 | Name                | Role                         |
 |---------------------|------------------------------|
 | Ivan                | Developer, System Integrator |
-| Ivan                | Database Designer            |
+| Justin           | Database Designer            |
 | Kirby               | API Tester, Documentation    |
-| **GitHub Copilot**  | **Algorithm & Matching Logic Developer** |
+
+
 
 ---
 
