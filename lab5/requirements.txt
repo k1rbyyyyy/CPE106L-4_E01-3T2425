@@ -1,0 +1,14 @@
+# CPE106L Lab 5 Requirements
+# No external dependencies required - uses Python standard library
+
+# Standard library modules used:
+# - sqlite3 (database operations)
+# - os (file system operations)  
+# - sys (system operations)
+# - datetime (date/time handling)
+# - csv (CSV export functionality)
+# - shutil (file operations)
+
+# Optional enhancements (not required for basic lab):
+# pandas>=1.5.0    # For advanced data analysis
+# matplotlib>=3.5.0 # For data visualization
